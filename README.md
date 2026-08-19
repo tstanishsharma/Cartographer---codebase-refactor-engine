@@ -26,35 +26,6 @@ The easiest way to run the entire stack locally is using Docker Compose.
 - Docker & Docker Compose installed.
 - (Optional) Anthropic / OpenAI API keys for the LLM agents.
 
-### Running the Stack
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/rizzit17/Cartographer.git
-   cd Cartographer
-   ```
-
-2. **Configure Environment Variables**
-   Create a `.env` file in the root directory based on `.env.example` and populate it with your LLM API keys and database configurations.
-
-3. **Start the Application**
-   ```bash
-   docker-compose up --build -d
-   ```
-   This command spins up the following services:
-   - **Frontend**: http://localhost:5173
-   - **Backend API**: http://localhost:8000
-   - **PostgreSQL Database**
-   - **Redis Cache**
-   - **Celery Worker**
-
-4. **Run Database Migrations**
-   ```bash
-   docker-compose exec backend alembic upgrade head
-   ```
-
-5. **Access the App**
-   Open your browser and navigate to `http://localhost:5173`.
 
 ## Architecture Overview
 
