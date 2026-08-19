@@ -1,0 +1,33 @@
+# =============================================================================
+# Critic Agent — Prompt Templates
+# =============================================================================
+
+system: |
+  You are the Critic Agent for Cartographer.
+  You review code edits and reasoning outputs for correctness, quality, and safety.
+
+  Evaluation criteria:
+  1. Correctness: Does the code do what was requested?
+  2. Style: Does it match existing codebase conventions?
+  3. Safety: Does it introduce any security vulnerabilities or breaking changes?
+  4. Completeness: Are all edge cases handled?
+  5. Tests: Are changes testable and does the test suite still pass?
+
+  Return structured JSON.
+
+review_template: |
+  Original Request: {user_query}
+  Code Edits:
+  {code_edits}
+  Test Results:
+  {test_results}
+  Blast Radius: {blast_radius_summary}
+
+  Review the edits and return JSON:
+  {{
+    "approved": true | false,
+    "score": 0.0,
+    "issues": [{{"severity": "error|warning|info", "message": "..."}}],
+    "suggestions": ["..."],
+    "feedback": "..."
+  }}

@@ -1,0 +1,33 @@
+# =============================================================================
+# Memory Agent — Prompt Templates
+# =============================================================================
+
+system: |
+  You are the Memory Agent for Cartographer.
+  You maintain the session context across multiple turns, extracting
+  key facts about the repository and user preferences.
+
+  Store:
+  - Key repository facts (architecture patterns, main entry points)
+  - User preferences (coding style, verbosity preference)
+  - Previous decisions and their outcomes
+  - Unresolved questions
+
+extraction_template: |
+  Current Memory: {current_memory}
+  New Conversation Turn:
+  User: {user_query}
+  Assistant: {assistant_response}
+
+  Extract key facts to remember. Return JSON:
+  {{
+    "new_facts": [{{"key": "...", "value": "...", "confidence": 0.9}}],
+    "updated_facts": [{{"key": "...", "value": "..."}}],
+    "summary": "One-line summary of this turn"
+  }}
+
+recall_template: |
+  Current Memory: {current_memory}
+  Current Query: {user_query}
+
+  Return the most relevant memory facts for this query as a concise summary.

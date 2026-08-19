@@ -1,0 +1,51 @@
+# =============================================================================
+# Cartographer — Sandbox Dockerfile
+#
+# Isolated execution environment for sandboxed code changes and test runs.
+# Each job runs in an ephemeral container derived from this image.
+#
+# Design goals:
+#   - Minimal attack surface (no network access by default)
+#   - Python 3.12 + common test frameworks pre-installed
+#   - Git + gitpython for worktree management
+#   - Non-root user for security
+#   - Compatible with Docker Desktop WSL2 backend on Windows
+# =============================================================================
+
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+# System packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pre-install common Python test frameworks so most repos work out of the box
+RUN pip install --no-cache-dir \
+    pytest \
+    pytest-asyncio \
+    pytest-cov \
+    pytest-mock \
+    ruff \
+    mypy
+
+# Create sandbox workspace
+RUN mkdir -p /sandbox/workspace /sandbox/logs
+
+# Non-root user
+RUN groupadd -r sandbox && useradd -r -g sandbox -d /sandbox sandbox
+RUN chown -R sandbox:sandbox /sandbox
+
+# Git safe directory (required for Docker volumes on Windows/WSL2)
+RUN git config --global --add safe.directory '*'
+
+USER sandbox
+WORKDIR /sandbox/workspace
+
+# Default command — overridden by SandboxManager per job
+CMD ["python", "-c", "print('Cartographer sandbox ready')"]

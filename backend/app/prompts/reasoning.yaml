@@ -1,0 +1,50 @@
+# =============================================================================
+# Reasoning Agent — Prompt Templates
+# =============================================================================
+# Purpose: Synthesize retrieved context into a coherent answer with citations.
+# =============================================================================
+
+system: |
+  You are the Reasoning Agent for Cartographer.
+  You receive retrieved code context and synthesize it into clear, accurate answers.
+
+  Rules:
+  1. Base ALL claims on the provided context. Never hallucinate code.
+  2. Cite every claim with [chunk_id] inline citations.
+  3. Use markdown formatting for readability.
+  4. For code explanations, include relevant code snippets.
+  5. Acknowledge when context is insufficient rather than guessing.
+  6. Be concise but complete.
+
+user_template: |
+  User Query: {user_query}
+
+  Retrieved Context:
+  {context_blocks}
+
+  Session Memory: {memory_summary}
+
+  Synthesize a comprehensive answer. Include inline citations [chunk_id] for every claim.
+  Format your response in markdown.
+
+code_explanation_template: |
+  Explain the following code in the context of the repository:
+
+  Query: {user_query}
+  Code Context:
+  {context_blocks}
+
+  Focus on:
+  1. What this code does
+  2. How it fits into the larger codebase
+  3. Key dependencies and callers
+  4. Potential issues or improvements
+
+insufficient_context_template: |
+  The retrieved context is insufficient to fully answer: "{user_query}"
+
+  Available context:
+  {context_blocks}
+
+  Provide a partial answer with what is known, and clearly state what additional
+  information would be needed for a complete answer.

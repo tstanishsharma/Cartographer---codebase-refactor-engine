@@ -1,0 +1,192 @@
+# =============================================================================
+# Cartographer — Docker Compose (Development)
+# =============================================================================
+# Usage:
+#   docker compose up -d              Start all services
+#   docker compose up -d postgres redis  Start only infra
+#   docker compose logs -f backend    Tail backend logs
+# =============================================================================
+
+x-backend-common: &backend-common
+  build:
+    context: ./backend
+    dockerfile: Dockerfile
+    target: development
+  env_file: .env
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  volumes:
+    - ./backend:/app                  # Hot-reload in dev
+    - /var/run/docker.sock:/var/run/docker.sock  # Sandbox: Docker socket
+  networks:
+    - cartographer-net
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL + pgvector
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: cartographer-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cartographer}
+      POSTGRES_USER: ${POSTGRES_USER:-cartographer}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cartographer_secret}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cartographer} -d ${POSTGRES_DB:-cartographer}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cartographer-net
+
+  # ---------------------------------------------------------------------------
+  # Redis
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: cartographer-redis
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    command: >
+      sh -c '
+      if [ -z "$$REDIS_PASSWORD" ]; then
+        redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+      else
+        redis-server --requirepass $$REDIS_PASSWORD --maxmemory 512mb --maxmemory-policy allkeys-lru
+      fi
+      '
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - cartographer-net
+
+  # ---------------------------------------------------------------------------
+  # Backend (FastAPI)
+  # ---------------------------------------------------------------------------
+  backend:
+    <<: *backend-common
+    container_name: cartographer-backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level info
+    ports:
+      - "8000:8000"
+      - "9090:9090"                   # Prometheus metrics
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+
+  # ---------------------------------------------------------------------------
+  # Celery Worker (background ingestion tasks)
+  # ---------------------------------------------------------------------------
+  worker:
+    <<: *backend-common
+    container_name: cartographer-worker
+    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=4
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+    depends_on:
+      - backend
+
+  # ---------------------------------------------------------------------------
+  # Frontend (Vite dev server)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: cartographer-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules              # Anonymous volume to avoid overwriting
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+      - VITE_WS_BASE_URL=ws://localhost:8000
+    networks:
+      - cartographer-net
+
+  # ---------------------------------------------------------------------------
+  # Nginx (reverse proxy — optional in dev, required in prod)
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: cartographer-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/docker/nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - cartographer-net
+    profiles:
+      - proxy                         # Only start with: docker compose --profile proxy up
+
+  # ---------------------------------------------------------------------------
+  # Prometheus
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: cartographer-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - cartographer-net
+    profiles:
+      - monitoring
+
+  # ---------------------------------------------------------------------------
+  # Grafana
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: cartographer-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - cartographer-net
+    profiles:
+      - monitoring
+
+volumes:
+  postgres-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  cartographer-net:
+    driver: bridge

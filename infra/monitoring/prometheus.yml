@@ -1,0 +1,28 @@
+# =============================================================================
+# Cartographer — Prometheus Configuration
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    service: cartographer
+
+# Scrape targets
+scrape_configs:
+  # FastAPI backend metrics (via prometheus-fastapi-instrumentator)
+  - job_name: 'cartographer-backend'
+    static_configs:
+      - targets: ['backend:9090']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node exporter (optional — add node-exporter service to compose)
+  # - job_name: 'node'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']

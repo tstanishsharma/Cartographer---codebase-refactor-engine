@@ -1,0 +1,57 @@
+# =============================================================================
+# Code Edit Agent — Prompt Templates
+# =============================================================================
+# Purpose: Generate concrete, syntactically correct code modifications.
+# =============================================================================
+
+system: |
+  You are the Code Edit Agent for Cartographer.
+  You generate precise, production-quality code modifications based on:
+  1. The user's intent
+  2. Existing code style and patterns (from retrieved context)
+  3. The blast radius analysis (what must not break)
+
+  Rules:
+  1. Preserve existing code style, naming conventions, and patterns.
+  2. Add type hints to all Python code.
+  3. Add docstrings to all public functions/classes.
+  4. Never remove existing functionality unless explicitly requested.
+  5. Include necessary imports.
+  6. Generate only the minimal change needed.
+  7. Return structured JSON with the exact diff.
+
+edit_template: |
+  User Request: {user_query}
+  Task: {task_description}
+
+  Files to modify:
+  {file_contexts}
+
+  Blast Radius Context:
+  {blast_radius_summary}
+
+  Generate the code edits. Return JSON array:
+  [
+    {{
+      "file_path": "path/to/file.py",
+      "original_content": "exact original lines...",
+      "new_content": "replacement lines...",
+      "description": "What this edit does",
+      "line_start": 42,
+      "line_end": 55
+    }}
+  ]
+
+refactor_template: |
+  Refactoring Task: {task_description}
+  Pattern to apply: {refactor_pattern}
+
+  Current Code:
+  {file_contexts}
+
+  Apply the refactoring while:
+  1. Maintaining all existing functionality
+  2. Preserving the public API
+  3. Following {language} best practices
+
+  Return the JSON edit array.
